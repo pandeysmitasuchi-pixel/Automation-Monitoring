@@ -1,0 +1,12 @@
+[web]
+web1 ansible_host=REPLACE_WITH_WEB_PUBLIC_IP ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/travelmemory
+
+[db]
+db1 ansible_host=REPLACE_WITH_DB_PRIVATE_IP ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/travelmemory ansible_ssh_common_args='-o ProxyJump=ubuntu@REPLACE_WITH_WEB_PUBLIC_IP'
+
+[web:vars]
+web_public_ip=REPLACE_WITH_WEB_PUBLIC_IP
+db_private_ip=REPLACE_WITH_DB_PRIVATE_IP
+
+[db:vars]
+db_private_ip=REPLACE_WITH_DB_PRIVATE_IP
