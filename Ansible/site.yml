@@ -1,0 +1,24 @@
+- name: Common setup and hardening for all servers
+  hosts: all
+  become: true
+  vars_files:
+    - group_vars/vault.yml
+  roles:
+    - common
+    - hardening
+
+- name: Install and secure MongoDB on private DB server
+  hosts: db
+  become: true
+  vars_files:
+    - group_vars/vault.yml
+  roles:
+    - mongodb
+
+- name: Deploy TravelMemory application on web server
+  hosts: web
+  become: true
+  vars_files:
+    - group_vars/vault.yml
+  roles:
+    - webserver
