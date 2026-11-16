@@ -1,0 +1,6 @@
+# Copy to vault.yml and encrypt it with ansible-vault before use.
+# Never commit the decrypted file or your vault password.
+mongodb_admin_user: "tm_admin"
+mongodb_admin_password: "REPLACE_WITH_A_LONG_RANDOM_PASSWORD"
+mongodb_app_user: "tm_app"
+mongodb_app_password: "REPLACE_WITH_ANOTHER_LONG_RANDOM_PASSWORD"
