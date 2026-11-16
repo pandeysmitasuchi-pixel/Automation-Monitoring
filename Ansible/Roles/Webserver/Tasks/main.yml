@@ -1,0 +1,112 @@
+- name: Install Nginx and build dependencies
+  ansible.builtin.apt:
+    name: [nginx, build-essential]
+    state: present
+    update_cache: true
+
+- name: Add NodeSource Node.js repository
+  ansible.builtin.shell: "curl -fsSL https://deb.nodesource.com/setup_{{ node_major }}.x | bash -"
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js LTS
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+    update_cache: true
+
+- name: Create unprivileged application group
+  ansible.builtin.group:
+    name: "{{ app_group }}"
+    system: true
+    state: present
+
+- name: Create unprivileged application user
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    group: "{{ app_group }}"
+    home: "{{ app_dir }}"
+    create_home: true
+    shell: /usr/sbin/nologin
+    system: true
+
+- name: Clone TravelMemory repository
+  ansible.builtin.git:
+    repo: "{{ app_repo }}"
+    dest: "{{ app_dir }}/source"
+    version: main
+    force: true
+  become_user: "{{ app_user }}"
+
+- name: Install backend dependencies
+  community.general.npm:
+    path: "{{ app_dir }}/source/backend"
+    production: true
+  become_user: "{{ app_user }}"
+
+- name: Write backend environment file
+  ansible.builtin.template:
+    src: backend.env.j2
+    dest: "{{ app_dir }}/source/backend/.env"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0600'
+  no_log: true
+  notify: Restart TravelMemory backend
+
+- name: Install frontend dependencies
+  community.general.npm:
+    path: "{{ app_dir }}/source/frontend"
+  become_user: "{{ app_user }}"
+
+- name: Build frontend with public same-origin API URL before build
+  ansible.builtin.command: npm run build
+  args:
+    chdir: "{{ app_dir }}/source/frontend"
+  environment:
+    REACT_APP_BACKEND_URL: "http://{{ web_public_ip }}"
+  become_user: "{{ app_user }}"
+
+- name: Install Nginx site configuration
+  ansible.builtin.template:
+    src: nginx-travelmemory.conf.j2
+    dest: /etc/nginx/sites-available/travelmemory
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload Nginx
+
+- name: Disable default Nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload Nginx
+
+- name: Enable TravelMemory Nginx site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/travelmemory
+    dest: /etc/nginx/sites-enabled/travelmemory
+    state: link
+  notify: Reload Nginx
+
+- name: Install backend systemd unit
+  ansible.builtin.template:
+    src: travelmemory-backend.service.j2
+    dest: /etc/systemd/system/travelmemory-backend.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart TravelMemory backend
+
+- name: Enable and start backend service
+  ansible.builtin.systemd:
+    name: travelmemory-backend
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Ensure Nginx is enabled and started
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
