@@ -1,0 +1,19 @@
+[Unit]
+Description=TravelMemory Node.js API
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_dir }}/source/backend
+EnvironmentFile={{ app_dir }}/source/backend/.env
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
