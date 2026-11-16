@@ -1,0 +1,22 @@
+- name: Disable SSH password authentication and root login
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-travelmemory-hardening.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      PasswordAuthentication no
+      PermitRootLogin no
+  notify: Restart SSH
+
+- name: Enable fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+
+- name: Enable unattended security upgrades
+  ansible.builtin.service:
+    name: unattended-upgrades
+    state: started
+    enabled: true
