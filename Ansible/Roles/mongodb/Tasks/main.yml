@@ -1,0 +1,75 @@
+- name: Install MongoDB repository prerequisites
+  ansible.builtin.apt:
+    name: [gnupg, curl]
+    state: present
+    update_cache: true
+
+- name: Download MongoDB signing key
+  ansible.builtin.get_url:
+    url: https://pgp.mongodb.com/server-7.0.asc
+    dest: /tmp/mongodb-server-7.0.asc
+    mode: '0644'
+
+- name: Dearmor MongoDB signing key
+  ansible.builtin.command: gpg --dearmor --yes -o /usr/share/keyrings/mongodb-server-7.0.gpg /tmp/mongodb-server-7.0.asc
+  args:
+    creates: /usr/share/keyrings/mongodb-server-7.0.gpg
+
+- name: Add MongoDB 7.0 apt repository for Ubuntu 22.04
+  ansible.builtin.apt_repository:
+    repo: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse"
+    filename: mongodb-org-7.0
+    state: present
+
+- name: Install MongoDB
+  ansible.builtin.apt:
+    name: mongodb-org
+    state: present
+    update_cache: true
+
+- name: Configure MongoDB to bind only to localhost and private interface
+  ansible.builtin.template:
+    src: mongod.conf.j2
+    dest: /etc/mongod.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart MongoDB
+
+- name: Enable and start MongoDB
+  ansible.builtin.service:
+    name: mongod
+    state: started
+    enabled: true
+
+- name: Flush MongoDB config handler
+  ansible.builtin.meta: flush_handlers
+
+- name: Check whether MongoDB admin user already exists (unauthenticated first-run check)
+  ansible.builtin.command: >-
+    mongosh --quiet --eval 'db.getSiblingDB("admin").getUser("{{ mongodb_admin_user }}") !== null'
+  register: admin_user_check
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Create MongoDB admin user on first run only
+  ansible.builtin.command: >-
+    mongosh --quiet --eval 'db.getSiblingDB("admin").createUser({user: "{{ mongodb_admin_user }}", pwd: "{{ mongodb_admin_password }}", roles: [{role: "root", db: "admin"}]})'
+  when: admin_user_check.rc == 0 and admin_user_check.stdout | trim == 'false'
+  no_log: true
+
+- name: Check whether application user exists
+  ansible.builtin.command: >-
+    mongosh --quiet -u '{{ mongodb_admin_user }}' -p '{{ mongodb_admin_password }}'
+    --authenticationDatabase admin --eval 'db.getSiblingDB("{{ app_database }}").getUser("{{ mongodb_app_user }}") !== null'
+  register: app_user_check
+  changed_when: false
+  no_log: true
+
+- name: Create restricted application database user when missing
+  ansible.builtin.command: >-
+    mongosh --quiet -u '{{ mongodb_admin_user }}' -p '{{ mongodb_admin_password }}'
+    --authenticationDatabase admin --eval 'db.getSiblingDB("{{ app_database }}").createUser({user: "{{ mongodb_app_user }}", pwd: "{{ mongodb_app_password }}", roles: [{role: "readWrite", db: "{{ app_database }}"}]})'
+  when: app_user_check.stdout | trim == 'false'
+  no_log: true
