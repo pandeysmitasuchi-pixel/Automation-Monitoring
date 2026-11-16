@@ -1,0 +1,31 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+terraform.tfvars
+*.auto.tfvars
+.terraform.lock.hcl
+
+# Credentials and runtime secrets
+*.pem
+*.key
+*.pub
+.aws/
+.env
+.env.*
+!.env.example
+vault-password.txt
+ansible/group_vars/*/vault.yml
+
+# Local/generated
+.DS_Store
+*.log
+*.retry
+__pycache__/
